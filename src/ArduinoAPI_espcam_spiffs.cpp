@@ -18,6 +18,10 @@ const int Pin_MISO = -1;
 const int Pin_MOSI = 13;
 const int Pin_CLK = 14;
 
+bool SerMouseDown = false;
+int SerMouseX = 0;
+int SerMouseY = 0;
+
 void setup( void ) {
     Serial.begin( 115200 );
 
@@ -51,16 +55,19 @@ void ArduinoAPI_SetAddressWindow( int x0, int y0, int x1, int y1 ) {
 }
 
 void ArduinoAPI_WritePixels( const uint16_t* Pixels, size_t Count ) {
-    spilcdWriteDataBlock( ( uint8_t* ) Pixels, Count, 1 );
+    spilcdWriteDataBlock( ( uint8_t* ) Pixels, Count * sizeof( uint16_t ), 1 );
 }
 
 void ArduinoAPI_GetMouseDelta( int* OutXDeltaPtr, int* OutYDeltaPtr ) {
-    *OutXDeltaPtr = 0;
-    *OutYDeltaPtr = 0;
+    *OutXDeltaPtr = SerMouseX;
+    *OutYDeltaPtr = SerMouseY;
+
+    SerMouseX = 0;
+    SerMouseY = 0;
 }
 
 int ArduinoAPI_GetMouseButton( void ) {
-    return 0;
+    return SerMouseDown;
 }
 
 uint64_t ArduinoAPI_GetTimeMS( void ) {
@@ -92,9 +99,7 @@ size_t ArduinoAPI_read( void* Buffer, size_t Size, size_t Nmemb, ArduinoFile Han
     size_t BytesRead = 0;
 
     if ( Handle ) {
-        digitalWrite( 4, HIGH );
         BytesRead = fread( Buffer, Size, Nmemb, ( FILE* ) Handle );
-        digitalWrite( 4, LOW );
     }
 
     return BytesRead;
@@ -149,6 +154,31 @@ void ArduinoAPI_free( void* Memory ) {
 }
 
 void ArduinoAPI_CheckForEvents( void ) {
+    while ( Serial.available( ) ) {
+        switch ( Serial.read( ) ) {
+            case 'w': {
+                SerMouseY--;
+                break;
+            }
+            case 's': {
+                SerMouseY++;
+                break;
+            }
+            case 'a': {
+                SerMouseX--;
+                break;
+            }
+            case 'd': {
+                SerMouseX++;
+                break;
+            }
+            case ' ': {
+                SerMouseDown = ! SerMouseDown;
+                break;
+            }
+            default: break;
+        }
+    }
 }
 
 bool Changed = false;
@@ -163,13 +193,13 @@ void ArduinoAPI_DrawScreen( const uint8_t* Screen ) {
 
     if ( Changed ) {
         Changed = false;
-        
+
         a = millis( );
-            DrawWindow( Screen, 0, 0 );
+            DrawWindowSubpixel( Screen, 0, 0 );
         b = millis( ) - a;
 
-        Serial.print( "Draw took " );
-        Serial.print( ( int ) b );
-        Serial.println( "ms" );
+        //Serial.print( "Draw took " );
+        //Serial.print( ( int ) b );
+        //Serial.println( "ms" );
     }
 }

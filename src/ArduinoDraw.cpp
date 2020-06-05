@@ -1,14 +1,28 @@
 #include <Arduino.h>
 #include "ArduinoAPI.h"
 #include "ArduinoDraw.h"
+
 #include "CNFGGLOB.h"
 
 #define RGB565( r, g, b ) ( ( ( b ) << 11 ) | ( ( g ) << 5 ) | ( r ) )
+
+#define EmScreenPitch ( vMacScreenWidth / 8 )
 
 uint16_t ScreenBuffer[ vMacScreenWidth ]; // HACKHACKHACK
 
 uint16_t ConversionTable1BPP[ 256 ][ 8 ];
 uint16_t ScaleTable[ 16 ];
+
+uint16_t SubpxDecodeTable_Wide[ 8 ][ 2 ] = {
+    { RGB565( 0, 0, 0 ), RGB565( 0, 0, 0 ) }, // 000
+    { RGB565( 0, 0, 0 ), RGB565( 0, 63, 31 ) }, // 001
+    { RGB565( 0, 0, 31 ), RGB565( 31, 0, 0 ) }, // 010
+    { RGB565( 0, 0, 31 ), RGB565( 31, 63, 31 ) }, // 011
+    { RGB565( 31, 63, 0 ), RGB565( 0, 0, 0 ) }, // 100
+    { RGB565( 31, 63, 0 ), RGB565( 0, 63, 31 ) }, // 101
+    { RGB565( 31, 63, 31 ), RGB565( 31, 0, 0 ) }, // 110
+    { RGB565( 31, 63, 31 ), RGB565( 31, 63, 31 ) } // 111
+};
 
 void SetupScalingTable( void ) {
 	float Color = 0.0f;
@@ -67,12 +81,11 @@ void DrawWindow( const uint8_t* Src, int SrcX, int SrcY ) {
         Dst = ScreenBuffer;
 
         for ( x = 0; x < Width; x+= 8 ) {
-            //ArduinoAPI_WritePixels( ConversionTable1BPP[ *Ptr++ ], 8 * 2 );
             memcpy( Dst, ConversionTable1BPP[ *Ptr++ ], 8 * 2 );
             Dst+= 8;
         }
 
-        ArduinoAPI_WritePixels( ScreenBuffer, Width * 2 );
+        ArduinoAPI_WritePixels( ScreenBuffer, Width );
     }
 }
 
@@ -117,4 +130,97 @@ void DrawWindowScaled( const uint8_t* Src, int SrcX, int SrcY ) {
 
 		ArduinoAPI_WritePixels( ScreenBuffer, Width );
 	}
+}
+
+void DrawWindowSubpixel( const uint8_t* Src, int SrcX, int SrcY ) {
+    const uint8_t* SrcLinePtr = NULL;
+    uint16_t* DestLinePtr = NULL;
+    int DisplayWidth = 0;
+    int DisplayHeight = 0;
+    uint32_t Data = 0;
+    int Temp = 0;
+    int x = 0;
+    int y = 0;
+    int i = 0;
+
+    ArduinoAPI_GetDisplayDimensions( &DisplayWidth, &DisplayHeight );
+
+    Temp = ( DisplayWidth * 3 ) / 2;
+    DisplayWidth = Temp >= DisplayWidth ? DisplayWidth : Temp;
+
+    DisplayWidth = vMacScreenWidth > DisplayWidth ? DisplayWidth : vMacScreenWidth;
+    DisplayHeight = vMacScreenWidth > DisplayHeight ? DisplayHeight : vMacScreenHeight;
+
+    ArduinoAPI_SetAddressWindow( 0, 0, DisplayWidth, DisplayHeight );
+
+    for ( y = 0; y < DisplayHeight; y++ ) {
+        SrcLinePtr = &Src[ y * EmScreenPitch ];
+        DestLinePtr = ScreenBuffer;
+
+        for ( x = 0; x < DisplayWidth; x+= 16 ) {
+			Data = ( *SrcLinePtr++ ) << 24;
+			Data |= ( *SrcLinePtr++ ) << 16;
+			Data |= ( *SrcLinePtr++ ) << 8;
+
+			Data = ~Data;
+
+			for ( i = 0; i < 8; i++ ) {
+				*DestLinePtr++ = SubpxDecodeTable_Wide[ ( Data >> 29 ) & 0x07 ][ 0 ];
+				*DestLinePtr++ = SubpxDecodeTable_Wide[ ( Data >> 29 ) & 0x07 ][ 1 ];
+
+				Data<<= 3;
+			}
+        }
+
+        ArduinoAPI_WritePixels( ScreenBuffer, DisplayWidth );
+    }
+
+#if 0
+	// 8 pixels in, 6 pixels out
+	const float PixRatio = 8.0f / 6.0f;
+	const uint8_t* SrcLinePtr = NULL;
+	uint16_t* Dst = ScreenBuffer;
+	uint32_t Data = 0;
+    int DisplayWidth = 0;
+    int DisplayHeight = 0;
+    int Width = 0;
+    int Height = 0;
+	int h = 0;
+	int x = 0;
+	int i = 0;
+
+	// Align to 8px
+	SrcX &= ~0x07;
+
+    ArduinoAPI_GetDisplayDimensions( &DisplayWidth, &DisplayHeight );
+        Width = ( ( DisplayWidth * 3 ) / 2 );
+
+        Width = 240;
+        Height = 240;
+	ArduinoAPI_SetAddressWindow( 0, 0, Width, Height );
+
+		for ( h = 0; h < Height; h++ ) {
+			SrcLinePtr = &Src[ ( SrcY + h ) * ( vMacScreenWidth / 8 ) ];
+			SrcLinePtr+= ( SrcX / 8 );
+
+			Dst = ScreenBuffer;
+
+			for ( x = 0; x < Width; x+= 16 ) {
+				Data = ( *SrcLinePtr++ ) << 24;
+				Data |= ( *SrcLinePtr++ ) << 16;
+				Data |= ( *SrcLinePtr++ ) << 8;
+
+				Data = ~Data;
+
+				for ( i = 0; i < 8; i++ ) {
+					*Dst++ = SubpxDecodeTable_Wide[ ( Data >> 29 ) & 0x07 ][ 0 ];
+					*Dst++ = SubpxDecodeTable_Wide[ ( Data >> 29 ) & 0x07 ][ 1 ];
+
+					Data<<= 3;
+				}
+			}
+
+            ArduinoAPI_WritePixels( ScreenBuffer, Width * 2 );
+		}
+#endif
 }

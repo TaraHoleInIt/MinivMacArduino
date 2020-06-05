@@ -620,6 +620,13 @@ LOCALPROC MousePositionNotify(int NewMousePosh, int NewMousePosv)
 
 LOCALPROC CheckMouseState(void)
 {
+	int dx = 0;
+	int dy = 0;
+
+	ArduinoAPI_GetMouseDelta( &dx, &dy );
+
+	MyMousePositionSetDelta( dx, dy );
+	MyMouseButtonSet( ArduinoAPI_GetMouseButton( ) );
 #if 0 != SDL_MAJOR_VERSION
 	/*
 		this doesn't work as desired, doesn't get mouse movements
