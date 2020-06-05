@@ -4,7 +4,9 @@
 #include <FS.h>
 #include <SPIFFS.h>
 #include "bb_spi_lcd.h"
+
 #include "ArduinoAPI.h"
+#include "ArduinoDraw.h"
 
 #define DisplayWidth 240
 #define DisplayHeight 240
@@ -23,6 +25,10 @@ void setup( void ) {
     spilcdFill( 0, 1 );
 
     SPIFFS.begin( );
+
+    Setup1BPPTable( );
+
+    pinMode( 4, OUTPUT );
 }
 
 void loop( void ) {
@@ -86,7 +92,9 @@ size_t ArduinoAPI_read( void* Buffer, size_t Size, size_t Nmemb, ArduinoFile Han
     size_t BytesRead = 0;
 
     if ( Handle ) {
+        digitalWrite( 4, HIGH );
         BytesRead = fread( Buffer, Size, Nmemb, ( FILE* ) Handle );
+        digitalWrite( 4, LOW );
     }
 
     return BytesRead;
@@ -141,4 +149,27 @@ void ArduinoAPI_free( void* Memory ) {
 }
 
 void ArduinoAPI_CheckForEvents( void ) {
+}
+
+bool Changed = false;
+
+void ArduinoAPI_ScreenChanged( int Top, int Left, int Bottom, int Right ) {
+    Changed = true;
+}
+
+void ArduinoAPI_DrawScreen( const uint8_t* Screen ) {
+    uint32_t a = 0;
+    uint32_t b = 0;
+
+    if ( Changed ) {
+        Changed = false;
+        
+        a = millis( );
+            DrawWindow( Screen, 0, 0 );
+        b = millis( ) - a;
+
+        Serial.print( "Draw took " );
+        Serial.print( ( int ) b );
+        Serial.println( "ms" );
+    }
 }

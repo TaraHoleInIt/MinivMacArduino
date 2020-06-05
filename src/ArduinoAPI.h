@@ -41,6 +41,9 @@ void ArduinoAPI_free( void* Memory );
 
 void ArduinoAPI_CheckForEvents( void );
 
+void ArduinoAPI_ScreenChanged( int Top, int Left, int Bottom, int Right );
+void ArduinoAPI_DrawScreen( const uint8_t* Screen );
+
 int minivmac_main( int Argc, char** Argv );
 
 #ifdef __cplusplus

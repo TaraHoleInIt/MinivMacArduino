@@ -47,66 +47,6 @@
 
 #include "STRCONST.h"
 
-#define RGB565( r, g, b ) ( ( ( b ) << 11 ) | ( ( g ) << 5 ) | ( r ) )
-
-/* --- Scaled screen drawing --- */
-uint16_t ScaleTable[ 16 ];
-
-void SetupScalingTable( void ) {
-	float Color = 0.0f;
-	int i = 0;
-	int j = 0;
-
-	for ( i = 0; i < 4; i++ ) {
-		for ( j = 0; j < 4; j++ ) {
-			Color = i & 0x02 ? 1.0f : 0.0f;
-			Color+= j & 0x02 ? 1.0f : 0.0f;
-			Color+= i & 0x01 ? 1.0f : 0.0f;
-			Color+= j & 0x01 ? 1.0f : 0.0f;
-
-			Color/= 4.0f;
-			Color*= 31.0f;
-
-			ScaleTable[ ( i << 2 ) | j ] = RGB565( ( int ) Color, ( ( int ) Color ) << 1, ( int ) Color );
-		}
-	}
-}
-
-void DrawWindowScaled( const uint8_t* Src, int SrcX, int SrcY, int Width, int Height ) {
-	static uint16_t ScreenBuffer[ 256 ];
-	const uint8_t* SrcLinePtrA = NULL;
-	const uint8_t* SrcLinePtrB = NULL;
-	uint16_t* Dst = NULL;
-	uint8_t a = 0;
-	uint8_t b = 0;
-	int x = 0;
-	int h = 0;
-
-	ArduinoAPI_SetAddressWindow( 0, 0, 240, 171 );
-
-	for ( h = 0; h < 342; h+= 2 ) {
-		SrcLinePtrA = &Src[ ( SrcY + h ) * ( 512 / 8 ) ];
-		SrcLinePtrA+= ( SrcX / 8 );
-
-		SrcLinePtrB = &Src[ ( SrcY + h + 1 ) * ( 512 / 8 ) ];
-		SrcLinePtrB+= ( SrcX / 8 );
-
-		Dst = ScreenBuffer;
-
-		for ( x = 0; x < 240; x+= 4 ) {
-			a = ~*SrcLinePtrA++;
-			b = ~*SrcLinePtrB++;
-
-			*Dst++ = ScaleTable[ ( ( ( a >> 6 ) & 0x03 ) << 2 ) | ( ( b >> 6 ) & 0x03 ) ];
-			*Dst++ = ScaleTable[ ( ( ( a >> 4 ) & 0x03 ) << 2 ) | ( ( b >> 4 ) & 0x03 ) ];
-			*Dst++ = ScaleTable[ ( ( ( a >> 2 ) & 0x03 ) << 2 ) | ( ( b >> 2 ) & 0x03 ) ];
-			*Dst++ = ScaleTable[ ( ( ( a ) & 0x03 ) << 2 ) | ( ( b ) & 0x03 ) ];
-		}
-
-		ArduinoAPI_WritePixels( ScreenBuffer, 240 );
-	}
-}
-
 /* --- some simple utilities --- */
 
 GLOBALOSGLUPROC MyMoveBytes(anyp srcPtr, anyp destPtr, si5b byteCount)
@@ -564,7 +504,7 @@ LOCALVAR blnr gTrueBackgroundFlag = falseblnr;
 LOCALVAR blnr CurSpeedStopped = falseblnr;
 
 LOCALPROC HaveChangedScreenBuff(ui4r top, ui4r left, ui4r bottom, ui4r right) {
-	DrawWindowScaled( GetCurDrawBuff( ), 0, 0, 240, 240 );
+	ArduinoAPI_ScreenChanged( top, left, bottom, right );
 }
 
 LOCALPROC MyDrawChangesAndClear(void)
@@ -1724,7 +1664,6 @@ LOCALFUNC blnr Screen_Init(void)
 	dbglog_writeln("enter Screen_Init");
 #endif
 
-	SetupScalingTable( );
 	InitKeyCodes();
 
 	return trueblnr;
@@ -1902,6 +1841,7 @@ LOCALPROC CheckForSystemEvents(void)
 		are waiting, don't wait for more.
 	*/
 	ArduinoAPI_CheckForEvents( );
+	ArduinoAPI_DrawScreen( GetCurDrawBuff( ) );
 }
 
 /*
