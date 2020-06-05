@@ -21,6 +21,7 @@ void ArduinoAPI_SetAddressWindow( int x0, int y0, int x1, int y1 );
 void ArduinoAPI_WritePixels( const uint16_t* Pixels, size_t Count );
 
 void ArduinoAPI_GetMouseDelta( int* OutXDeltaPtr, int* OutYDeltaPtr );
+void ArduinoAPI_GiveEmulatedMouseToArduino( int* EmMouseX, int* EmMouseY );
 int ArduinoAPI_GetMouseButton( void );
 
 uint64_t ArduinoAPI_GetTimeMS( void );

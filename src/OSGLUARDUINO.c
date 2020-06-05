@@ -620,6 +620,8 @@ LOCALPROC MousePositionNotify(int NewMousePosh, int NewMousePosv)
 
 LOCALPROC CheckMouseState(void)
 {
+	int MouseH = 0;
+	int MouseV = 0;
 	int dx = 0;
 	int dy = 0;
 
@@ -627,6 +629,11 @@ LOCALPROC CheckMouseState(void)
 
 	MyMousePositionSetDelta( dx, dy );
 	MyMouseButtonSet( ArduinoAPI_GetMouseButton( ) );
+
+	MouseH = CurMouseH;
+	MouseV = CurMouseV;
+
+	ArduinoAPI_GiveEmulatedMouseToArduino( &MouseH, &MouseV );
 #if 0 != SDL_MAJOR_VERSION
 	/*
 		this doesn't work as desired, doesn't get mouse movements

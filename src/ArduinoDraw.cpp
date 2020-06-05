@@ -146,6 +146,9 @@ void DrawWindowSubpixel( const uint8_t* Src, int SrcX, int SrcY ) {
     ArduinoAPI_GetDisplayDimensions( &DisplayWidth, &DisplayHeight );
 
     Temp = ( DisplayWidth * 3 ) / 2;
+
+    SrcX = ( SrcX >= ( vMacScreenWidth - Temp ) ) ? ( vMacScreenWidth - Temp ) : SrcX;
+    SrcY = ( SrcY >= ( vMacScreenHeight - DisplayHeight ) ) ? ( vMacScreenHeight - DisplayHeight ) : SrcY;
     DisplayWidth = Temp >= DisplayWidth ? DisplayWidth : Temp;
 
     DisplayWidth = vMacScreenWidth > DisplayWidth ? DisplayWidth : vMacScreenWidth;
@@ -153,8 +156,12 @@ void DrawWindowSubpixel( const uint8_t* Src, int SrcX, int SrcY ) {
 
     ArduinoAPI_SetAddressWindow( 0, 0, DisplayWidth, DisplayHeight );
 
+    Src+= ( SrcY * EmScreenPitch );
+
     for ( y = 0; y < DisplayHeight; y++ ) {
         SrcLinePtr = &Src[ y * EmScreenPitch ];
+        SrcLinePtr+= ( SrcX / 8 );
+
         DestLinePtr = ScreenBuffer;
 
         for ( x = 0; x < DisplayWidth; x+= 16 ) {

@@ -19,8 +19,11 @@ const int Pin_MOSI = 13;
 const int Pin_CLK = 14;
 
 bool SerMouseDown = false;
-int SerMouseX = 0;
-int SerMouseY = 0;
+int SerMouseDX = 0;
+int SerMouseDY = 0;
+
+int MouseX = 0;
+int MouseY = 0;
 
 void setup( void ) {
     Serial.begin( 115200 );
@@ -59,11 +62,16 @@ void ArduinoAPI_WritePixels( const uint16_t* Pixels, size_t Count ) {
 }
 
 void ArduinoAPI_GetMouseDelta( int* OutXDeltaPtr, int* OutYDeltaPtr ) {
-    *OutXDeltaPtr = SerMouseX;
-    *OutYDeltaPtr = SerMouseY;
+    *OutXDeltaPtr = SerMouseDX;
+    *OutYDeltaPtr = SerMouseDY;
 
-    SerMouseX = 0;
-    SerMouseY = 0;
+    SerMouseDX = 0;
+    SerMouseDY = 0;
+}
+
+void ArduinoAPI_GiveEmulatedMouseToArduino( int* EmMouseX, int* EmMouseY ) {
+    MouseX = *EmMouseX;
+    MouseY = *EmMouseY;
 }
 
 int ArduinoAPI_GetMouseButton( void ) {
@@ -71,7 +79,7 @@ int ArduinoAPI_GetMouseButton( void ) {
 }
 
 uint64_t ArduinoAPI_GetTimeMS( void ) {
-    return ( uint64_t ) millis( );
+    return ( uint64_t ) 1591396325807 + ( uint64_t ) millis( );
 }
 
 void ArduinoAPI_Yield( void ) {
@@ -157,19 +165,19 @@ void ArduinoAPI_CheckForEvents( void ) {
     while ( Serial.available( ) ) {
         switch ( Serial.read( ) ) {
             case 'w': {
-                SerMouseY--;
+                SerMouseDY--;
                 break;
             }
             case 's': {
-                SerMouseY++;
+                SerMouseDY++;
                 break;
             }
             case 'a': {
-                SerMouseX--;
+                SerMouseDX--;
                 break;
             }
             case 'd': {
-                SerMouseX++;
+                SerMouseDX++;
                 break;
             }
             case ' ': {
@@ -188,14 +196,23 @@ void ArduinoAPI_ScreenChanged( int Top, int Left, int Bottom, int Right ) {
 }
 
 void ArduinoAPI_DrawScreen( const uint8_t* Screen ) {
+    int x = 0;
+    int y = 0;
+
     uint32_t a = 0;
     uint32_t b = 0;
 
     if ( Changed ) {
         Changed = false;
 
+        x = MouseX - ( DisplayWidth / 2 );
+        y = MouseY - ( DisplayHeight / 2 );
+
+        x = x < 0 ? 0 : x;
+        y = y < 0 ? 0 : y;
+
         a = millis( );
-            DrawWindowSubpixel( Screen, 0, 0 );
+            DrawWindowSubpixel( Screen, x, y );
         b = millis( ) - a;
 
         //Serial.print( "Draw took " );
