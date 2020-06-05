@@ -1,0 +1,70 @@
+#include <Arduino.h>
+#include "ArduinoAPI.h"
+
+void ArduinoAPI_GetDisplayDimensions( int* OutWidthPtr, int* OutHeightPtr ) {
+    *OutWidthPtr = 0;
+    *OutHeightPtr = 0;
+}
+
+void ArduinoAPI_SetAddressWindow( int x0, int y0, int x1, int y1 ) {
+}
+
+void ArduinoAPI_WritePixels( const uint16_t* Pixels, size_t Count ) {
+}
+
+void ArduinoAPI_GetMouseDelta( int* OutXDeltaPtr, int* OutYDeltaPtr ) {
+    *OutXDeltaPtr = 0;
+    *OutYDeltaPtr = 0;
+}
+
+int ArduinoAPI_GetMouseButton( void ) {
+    return 0;
+}
+
+uint64_t ArduinoAPI_GetTimeMS( void ) {
+    return 0;
+}
+
+void ArduinoAPI_Yield( void ) {
+}
+
+void ArduinoAPI_Delay( uint32_t MSToDelay ) {
+}
+
+ArduinoFile ArduinoAPI_open( const char* Path, const char* Mode ) {
+    return NULL;
+}
+
+void ArduinoAPI_close( ArduinoFile Handle ) {
+}
+
+size_t ArduinoAPI_read( void* Buffer, size_t Size, size_t Nmemb, ArduinoFile Handle ) {
+    return 0;
+}
+
+size_t ArduinoAPI_write( const void* Buffer, size_t Size, size_t Nmemb, ArduinoFile Handle ) {
+    return 0;
+}
+
+size_t ArduinoAPI_tell( ArduinoFile Handle ) {
+    return 0;
+}
+
+size_t ArduinoAPI_seek( ArduinoFile Handle, size_t Offset, int Whence ) {
+    return 0;
+}
+
+int ArduinoAPI_eof( ArduinoFile Handle ) {
+    return 0;
+}
+
+void* ArduinoAPI_malloc( size_t Size ) {
+    return NULL;
+}
+
+void* ArduinoAPI_calloc( size_t Nmemb, size_t Size ) {
+    return NULL;
+}
+
+void ArduinoAPI_free( void* Memory ) {
+}

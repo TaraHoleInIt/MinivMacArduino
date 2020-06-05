@@ -1,0 +1,115 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include <WiFi.h>
+#include <FS.h>
+#include <SD_MMC.h>
+#include "bb_spi_lcd.h"
+
+#define RGB565( r, g, b ) ( ( ( b ) << 11 ) | ( ( g ) << 5 ) | ( r ) )
+
+#define DisplayWidth 256
+#define DisplayHeight 240
+
+#define EmScreenPitch ( 512 / 8 )
+
+const int Pin_CS = -1;
+const int Pin_DC = 2;
+const int Pin_RST = 0;
+const int Pin_MISO = -1;
+const int Pin_MOSI = 13;
+const int Pin_CLK = 14;
+
+extern "C" int minivmac_main( int Argc, char** Argv );
+
+uint16_t SubpxDecodeTable_Wide[ 8 ][ 2 ] = {
+    { RGB565( 0, 0, 0 ), RGB565( 0, 0, 0 ) }, // 000
+    { RGB565( 0, 0, 0 ), RGB565( 0, 63, 31 ) }, // 001
+    { RGB565( 0, 0, 31 ), RGB565( 31, 0, 0 ) }, // 010
+    { RGB565( 0, 0, 31 ), RGB565( 31, 63, 31 ) }, // 011
+    { RGB565( 31, 63, 0 ), RGB565( 0, 0, 0 ) }, // 100
+    { RGB565( 31, 63, 0 ), RGB565( 0, 63, 31 ) }, // 101
+    { RGB565( 31, 63, 31 ), RGB565( 31, 0, 0 ) }, // 110
+    { RGB565( 31, 63, 31 ), RGB565( 31, 63, 31 ) } // 111
+};
+
+uint16_t ScreenBuffer[ 320 ];
+
+void DrawWindowSubpixel( const uint8_t* Src, int SrcX, int SrcY, int Width, int Height ) {
+	// 8 pixels in, 6 pixels out
+	const float PixRatio = 8.0f / 6.0f;
+	const int MaxX = ( int ) ( 512.0f / PixRatio ) - ( Width );
+	const uint8_t* SrcLinePtr = NULL;
+	uint16_t* Dst = ScreenBuffer;
+	uint32_t Data = 0;
+	int h = 0;
+	int x = 0;
+	int i = 0;
+
+	// Align to 8px
+	SrcX &= ~0x07;
+
+	// Range limit
+	SrcX = ( SrcX < 0 ) ? 0 : SrcX;
+	SrcX = ( SrcX > MaxX ) ? MaxX : SrcX;
+
+	Serial.print( SrcX );
+	Serial.print( " of " );
+	Serial.println( MaxX );
+
+	SrcY = ( SrcY < 0 ) ? 0 : SrcY;
+	SrcY = SrcY >= ( 342 - Height ) ? 342 - Height : SrcY;
+
+    spilcdSetPosition( 0, 0, 240, 240, 1 );
+
+		for ( h = 0; h < Height; h++ ) {
+			SrcLinePtr = &Src[ ( SrcY + h ) * EmScreenPitch ];
+			SrcLinePtr+= ( SrcX / 8 );
+
+			Dst = ScreenBuffer;
+
+			for ( x = 0; x < Width; x+= 16 ) {
+				Data = ( *SrcLinePtr++ ) << 24;
+				Data |= ( *SrcLinePtr++ ) << 16;
+				Data |= ( *SrcLinePtr++ ) << 8;
+
+				Data = ~Data;
+
+				for ( i = 0; i < 8; i++ ) {
+					*Dst++ = SubpxDecodeTable_Wide[ ( Data >> 29 ) & 0x07 ][ 0 ];
+					*Dst++ = SubpxDecodeTable_Wide[ ( Data >> 29 ) & 0x07 ][ 1 ];
+
+					Data<<= 3;
+				}
+			}
+
+			spilcdWriteDataBlock( ( uint8_t* ) ScreenBuffer, Width * 2, 1 );
+		}
+}
+
+extern "C" void Arduino_DrawScreen( const uint8_t* Src, int SrcX, int SrcY ) {
+    Serial.println( "hi" );
+
+    //DrawWindowSubpixel( Src, 0, 0, 240, 240 );
+}
+
+void setup( void ) {
+    Serial.begin( 115200 );
+
+    Serial.println( "Built " __DATE__ " at " __TIME__ );
+    Serial.println( "Ready...\n" );
+
+    Serial.print( "SD: " );
+    Serial.println( SD_MMC.begin( "/sdcard", true ) );
+
+    spilcdInit( LCD_ILI9341, 0, 0, 0, 8000000, Pin_CS, Pin_DC, Pin_RST, -1, Pin_MISO, Pin_MOSI, Pin_CLK );
+    spilcdFill( 0x553b, 1 );
+}
+
+void loop( void ) {
+    minivmac_main( 0, NULL );
+    Serial.println( "Should not have exited, but did" );
+
+    while ( true ) {   
+        yield( );
+    }
+}
