@@ -76,6 +76,8 @@ void DrawWindow( const uint8_t* Src, int SrcX, int SrcY ) {
 
     ArduinoAPI_SetAddressWindow( 0, 0, Width, Height );
 
+    Src+= ( SrcY * EmScreenPitch );
+
     for ( y = 0; y < Height; y++ ) {
         Ptr = &Src[ ( y * ( vMacScreenWidth / 8 ) ) + ( SrcX / 8 ) ];
         Dst = ScreenBuffer;
@@ -109,7 +111,7 @@ void DrawWindowScaled( const uint8_t* Src, int SrcX, int SrcY ) {
 
     ArduinoAPI_SetAddressWindow( 0, 0, Width, Height );
 
-	for ( h = 0; h < Height; h+= 2 ) {
+	for ( h = 0; h < 342; h+= 2 ) {
 		SrcLinePtrA = &Src[ ( SrcY + h ) * ( vMacScreenWidth / 8 ) ];
 		SrcLinePtrA+= ( SrcX / 8 );
 
