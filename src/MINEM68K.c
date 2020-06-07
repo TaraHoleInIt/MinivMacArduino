@@ -46,6 +46,7 @@
 #endif
 
 #include "MINEM68K.h"
+#include "CNFGRAPI.h"
 
 /*
 	ReportAbnormalID unused 0x0123 - 0x01FF
@@ -254,7 +255,9 @@ LOCALVAR struct regstruct
 #else
 	DecOpR disp_table[disp_table_sz];
 #endif
-} regs;
+};
+
+DRAM_ATTR struct regstruct regs;
 
 #define ui5r_MSBisSet(x) (((si5r)(x)) < 0)
 

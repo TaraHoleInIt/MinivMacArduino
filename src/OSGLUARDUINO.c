@@ -1899,7 +1899,7 @@ label_retry:
 #endif
 
 	if (ExtraTimeNotOver()) {
-		//vTaskDelay( ( NextIntTime - LastTime ) * portTICK_PERIOD_MS );
+		ArduinoAPI_Yield( );
 		goto label_retry;
 	}
 

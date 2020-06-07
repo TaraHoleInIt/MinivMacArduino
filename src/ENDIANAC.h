@@ -37,7 +37,7 @@
 #if BigEndianUnaligned
 #define do_get_mem_word(a) ((ui4r)*((ui4b *)(a)))
 #else
-LOCALINLINEFUNC ui4r do_get_mem_word(ui3p a)
+LOCALINLINEFUNC IRAM_ATTR ui4r do_get_mem_word(ui3p a)
 {
 #if LittleEndianUnaligned
 	ui4b b = (*((ui4b *)(a)));
@@ -54,7 +54,7 @@ LOCALINLINEFUNC ui4r do_get_mem_word(ui3p a)
 #elif HaveMySwapUi5r && LittleEndianUnaligned
 #define do_get_mem_long(a) (MySwapUi5r((ui5r)*((ui5b *)(a))))
 #else
-LOCALINLINEFUNC ui5r do_get_mem_long(ui3p a)
+LOCALINLINEFUNC IRAM_ATTR ui5r do_get_mem_long(ui3p a)
 {
 #if LittleEndianUnaligned
 #if 0
@@ -98,7 +98,7 @@ LOCALINLINEFUNC ui5r do_get_mem_long(ui3p a)
 #if BigEndianUnaligned
 #define do_put_mem_word(a, v) ((*((ui4b *)(a))) = (v))
 #else
-LOCALINLINEFUNC void do_put_mem_word(ui3p a, ui4r v)
+LOCALINLINEFUNC IRAM_ATTR void do_put_mem_word(ui3p a, ui4r v)
 {
 #if LittleEndianUnaligned
 	ui4b b = ((v & 0x00FF) << 8) | ((v >> 8) & 0x00FF);
@@ -116,7 +116,7 @@ LOCALINLINEFUNC void do_put_mem_word(ui3p a, ui4r v)
 #elif HaveMySwapUi5r && LittleEndianUnaligned
 #define do_put_mem_long(a, v) ((*((ui5b *)(a))) = MySwapUi5r(v))
 #else
-LOCALINLINEFUNC void do_put_mem_long(ui3p a, ui5r v)
+LOCALINLINEFUNC IRAM_ATTR void do_put_mem_long(ui3p a, ui5r v)
 {
 #if LittleEndianUnaligned
 	ui4b b1 = v;

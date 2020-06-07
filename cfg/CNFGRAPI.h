@@ -8,6 +8,7 @@
 */
 
 #include "ArduinoAPI.h"
+#include "esp_attr.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +21,7 @@
 #define kRomCheckSum2 0x4D1EEAE1
 #define kRomCheckSum3 0x4D1F8172
 #define RomStartCheckSum 1
-#define EnableDragDrop 1
+#define EnableDragDrop 0
 #define SaveDialogEnable 1
 #define EnableAltKeysMode 0
 #define MKC_formac_Control MKC_CM
@@ -58,7 +59,7 @@
 #define MyWindowScale 2
 #define WantInitRunInBackground 0
 #define WantInitNotAutoSlow 0
-#define WantInitSpeedValue -1
+#define WantInitSpeedValue 5
 #define WantEnblCtrlInt 1
 #define WantEnblCtrlRst 1
 #define WantEnblCtrlKtg 1

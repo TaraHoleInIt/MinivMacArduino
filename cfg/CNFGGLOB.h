@@ -13,8 +13,10 @@
 #error "source is configured for 32 bit compiler"
 #endif
 
-#define MayInline inline __attribute__((always_inline))
-#define MayNotInline __attribute__((noinline))
+#include "esp_attr.h"
+
+#define MayInline inline __attribute__((always_inline)) IRAM_ATTR
+#define MayNotInline __attribute__((noinline)) IRAM_ATTR
 #define SmallGlobals 1
 #define cIncludeUnused 0
 #define UnusedParam(p) (void) p
@@ -69,7 +71,7 @@ typedef si5b si5r;
 #define MySoundRecenterSilence 0
 #define kLn2SoundSampSz 3
 
-#define dbglog_HAVE 1
+#define dbglog_HAVE 0
 #define WantAbnormalReports 0
 
 #define NumDrives 6

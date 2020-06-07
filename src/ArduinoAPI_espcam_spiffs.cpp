@@ -4,7 +4,6 @@
 #include <FS.h>
 #include <SPIFFS.h>
 #include "bb_spi_lcd.h"
-#include "TFT_eSPI.h"
 
 #include "ArduinoAPI.h"
 #include "ArduinoDraw.h"
@@ -26,15 +25,13 @@ int SerMouseDY = 0;
 int MouseX = 0;
 int MouseY = 0;
 
-//TFT_eSPI LCD = TFT_eSPI( );
-
-#define DrawScreenEvent 0x80
+#define DrawScreenEvent 0x01
 
 EventGroupHandle_t RenderTaskEventHandle = NULL;
 SemaphoreHandle_t RenderTaskLock = NULL;
 TaskHandle_t RenderTaskHandle = NULL;
 
-volatile const uint8_t* ScreenPtr = NULL;
+volatile const uint8_t* EmScreenPtr = NULL;
 
 void PrintCore( const char* Str ) {
     Serial.print( Str );
@@ -45,29 +42,21 @@ void PrintCore( const char* Str ) {
 void RenderTask( void* Param ) {
     int x = 0;
     int y = 0;
-    int i = 0;
 
     PrintCore( __func__ );
 
     while ( true ) {
-        //digitalWrite( 4, i );
-        //i = ! i;
-
         x = MouseX - ( DisplayWidth / 2 );
         y = MouseY - ( DisplayHeight / 2 );
 
         x = x < 0 ? 0 : x;
         y = y < 0 ? 0 : y;
 
-        //digitalWrite( 4, HIGH );
-        xEventGroupWaitBits( RenderTaskEventHandle, 0x01, pdTRUE, pdFALSE, portMAX_DELAY );
-        //digitalWrite( 4, LOW );
+        xEventGroupWaitBits( RenderTaskEventHandle, DrawScreenEvent, pdTRUE, pdTRUE, portMAX_DELAY );
 
-        //xSemaphoreTake( RenderTaskLock, portMAX_DELAY );
-            DrawWindow( ( const uint8_t* ) ScreenPtr, x, y );
-        //xSemaphoreGive( RenderTaskLock );
-
-        //printf( "Rendering...\n" );
+        xSemaphoreTake( RenderTaskLock, portMAX_DELAY );
+            DrawWindowSubpixel( ( const uint8_t* ) EmScreenPtr, x, y );
+        xSemaphoreGive( RenderTaskLock );
     }
 }
 
@@ -77,9 +66,6 @@ void setup( void ) {
     spilcdInit( LCD_ST7789_NOCS, 0, 0, 0, 40000000, Pin_CS, Pin_DC, Pin_RST, -1, Pin_MISO, Pin_MOSI, Pin_CLK );
     spilcdFill( 0, 1 );
 
-    //LCD.begin( );
-    //LCD.fillScreen( 0 );
-
     SPIFFS.begin( );
 
     Setup1BPPTable( );
@@ -88,7 +74,7 @@ void setup( void ) {
     pinMode( 4, OUTPUT );
 
     RenderTaskEventHandle = xEventGroupCreate( );
-    RenderTaskLock = xSemaphoreCreateBinary( );
+    RenderTaskLock = xSemaphoreCreateMutex( );
 
     xTaskCreatePinnedToCore( RenderTask, "RenderTask", 4096, NULL, 0, &RenderTaskHandle, 0 );
 
@@ -97,6 +83,9 @@ void setup( void ) {
     Serial.println( ( int ) RenderTaskHandle );
 
     PrintCore( __func__ );
+
+    Serial.print( "Freq: " );
+    Serial.println( ( int ) getCpuFrequencyMhz( ) ); 
 }
 
 void loop( void ) {
@@ -118,12 +107,10 @@ void ArduinoAPI_GetDisplayDimensions( int* OutWidthPtr, int* OutHeightPtr ) {
 
 void ArduinoAPI_SetAddressWindow( int x0, int y0, int x1, int y1 ) {
     spilcdSetPosition( x0, y0, ( x1 - x0 ), ( y1 - y0 ), 1 );
-    //setAddrWindow( x0, y0, ( x1 - x0 ), ( y1 - y0 ) );
 }
 
 void ArduinoAPI_WritePixels( const uint16_t* Pixels, size_t Count ) {
     spilcdWriteDataBlock( ( uint8_t* ) Pixels, Count * sizeof( uint16_t ), 1 );
-    //LCD.pushColors( ( uint8_t* ) Pixels, Count * sizeof( uint16_t ) );
 }
 
 void ArduinoAPI_GetMouseDelta( int* OutXDeltaPtr, int* OutYDeltaPtr ) {
@@ -144,7 +131,7 @@ int ArduinoAPI_GetMouseButton( void ) {
 }
 
 uint64_t ArduinoAPI_GetTimeMS( void ) {
-    return ( uint64_t ) 1591396325807 + ( uint64_t ) millis( );
+    return ( uint64_t ) 1591551981844L + ( uint64_t ) millis( );
 }
 
 void ArduinoAPI_Yield( void ) {
@@ -215,11 +202,11 @@ int ArduinoAPI_eof( ArduinoFile Handle ) {
 }
 
 void* ArduinoAPI_malloc( size_t Size ) {
-    return heap_caps_malloc( Size, MALLOC_CAP_SPIRAM );
+    return heap_caps_malloc( Size, ( Size >= 262144 ) ? MALLOC_CAP_SPIRAM : MALLOC_CAP_DEFAULT );
 }
 
 void* ArduinoAPI_calloc( size_t Nmemb, size_t Size ) {
-    return heap_caps_calloc( Nmemb, Size, MALLOC_CAP_SPIRAM );
+    return heap_caps_calloc( Nmemb, Size, ( ( Size * Nmemb ) >= 262144 ) ? MALLOC_CAP_SPIRAM : MALLOC_CAP_DEFAULT );
 }
 
 void ArduinoAPI_free( void* Memory ) {
@@ -261,37 +248,14 @@ void ArduinoAPI_ScreenChanged( int Top, int Left, int Bottom, int Right ) {
 }
 
 void ArduinoAPI_DrawScreen( const uint8_t* Screen ) {
-    int x = 0;
-    int y = 0;
-
-    uint32_t a = 0;
-    uint32_t b = 0;
-
     if ( Changed ) {
+        EmScreenPtr = Screen;
         Changed = false;
-        ScreenPtr = ( volatile const uint8_t* ) Screen;
 
-        //if ( xSemaphoreTake( RenderTaskLock, 0 ) == pdTRUE ) {
-        //    xSemaphoreGive( RenderTaskLock );
+        if ( xSemaphoreTake( RenderTaskLock, 0 ) == pdTRUE ) {
+            xSemaphoreGive( RenderTaskLock );
 
-            xEventGroupSetBits( RenderTaskEventHandle, 0x01 );
-            //Serial.println( "Here" );
-        //}
-#if 0
-        x = MouseX - ( DisplayWidth / 2 );
-        y = MouseY - ( DisplayHeight / 2 );
-
-        x = x < 0 ? 0 : x;
-        y = y < 0 ? 0 : y;
-
-        a = millis( );
-            //DrawWindowSubpixel( Screen, x, y );
-            DrawWindowScaled( Screen, x, y );
-        b = millis( ) - a;
-
-        Serial.print( "Draw took " );
-        Serial.print( ( int ) b );
-        Serial.println( "ms" );
-#endif
+            xEventGroupSetBits( RenderTaskEventHandle, DrawScreenEvent );
+        }
     }
 }

@@ -8,12 +8,12 @@
 
 #define EmScreenPitch ( vMacScreenWidth / 8 )
 
-uint16_t ScreenBuffer[ vMacScreenWidth ]; // HACKHACKHACK
+DRAM_ATTR uint16_t ScreenBuffer[ vMacScreenWidth ]; // HACKHACKHACK
 
-uint16_t ConversionTable1BPP[ 256 ][ 8 ];
-uint16_t ScaleTable[ 16 ];
+DRAM_ATTR uint16_t ConversionTable1BPP[ 256 ][ 8 ];
+DRAM_ATTR uint16_t ScaleTable[ 16 ];
 
-uint16_t SubpxDecodeTable_Wide[ 8 ][ 2 ] = {
+DRAM_ATTR uint16_t SubpxDecodeTable_Wide[ 8 ][ 2 ] = {
     { RGB565( 0, 0, 0 ), RGB565( 0, 0, 0 ) }, // 000
     { RGB565( 0, 0, 0 ), RGB565( 0, 63, 31 ) }, // 001
     { RGB565( 0, 0, 31 ), RGB565( 31, 0, 0 ) }, // 010
@@ -59,7 +59,7 @@ void Setup1BPPTable( void ) {
     }
 }
 
-void DrawWindow( const uint8_t* Src, int SrcX, int SrcY ) {
+IRAM_ATTR void DrawWindow( const uint8_t* Src, int SrcX, int SrcY ) {
     const uint8_t* Ptr = NULL;
     uint16_t* Dst = NULL;
     int DisplayWidth = 0;
@@ -70,6 +70,8 @@ void DrawWindow( const uint8_t* Src, int SrcX, int SrcY ) {
     int y = 0;
 
     ArduinoAPI_GetDisplayDimensions( &DisplayWidth, &DisplayHeight );
+
+    SrcY = ( SrcY >= ( vMacScreenHeight - DisplayHeight ) ) ? ( vMacScreenHeight - DisplayHeight - 1 ) : SrcY;
 
     Width = ( vMacScreenWidth >= DisplayWidth ) ? DisplayWidth : vMacScreenWidth;
     Height = ( vMacScreenHeight >= DisplayHeight ) ? DisplayHeight : vMacScreenHeight;
@@ -91,7 +93,7 @@ void DrawWindow( const uint8_t* Src, int SrcX, int SrcY ) {
     }
 }
 
-void DrawWindowScaled( const uint8_t* Src, int SrcX, int SrcY ) {
+IRAM_ATTR void DrawWindowScaled( const uint8_t* Src, int SrcX, int SrcY ) {
 	const uint8_t* SrcLinePtrA = NULL;
 	const uint8_t* SrcLinePtrB = NULL;
     int DisplayWidth = 0;
@@ -134,7 +136,7 @@ void DrawWindowScaled( const uint8_t* Src, int SrcX, int SrcY ) {
 	}
 }
 
-void DrawWindowSubpixel( const uint8_t* Src, int SrcX, int SrcY ) {
+IRAM_ATTR void DrawWindowSubpixel( const uint8_t* Src, int SrcX, int SrcY ) {
     const uint8_t* SrcLinePtr = NULL;
     uint16_t* DestLinePtr = NULL;
     int DisplayWidth = 0;

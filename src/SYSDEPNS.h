@@ -120,7 +120,7 @@ typedef si5r simr;
 #endif
 
 #ifndef LittleEndianUnaligned
-#define LittleEndianUnaligned 0
+#define LittleEndianUnaligned 1
 #endif
 
 #ifndef ui3rr
