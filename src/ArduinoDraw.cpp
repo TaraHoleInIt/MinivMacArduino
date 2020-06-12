@@ -71,7 +71,8 @@ IRAM_ATTR void DrawWindow( const uint8_t* Src, int SrcX, int SrcY ) {
 
     ArduinoAPI_GetDisplayDimensions( &DisplayWidth, &DisplayHeight );
 
-    SrcY = ( SrcY >= ( vMacScreenHeight - DisplayHeight ) ) ? ( vMacScreenHeight - DisplayHeight - 1 ) : SrcY;
+    SrcX = ( SrcX >= ( vMacScreenWidth - DisplayWidth ) ) ? ( vMacScreenWidth - DisplayWidth - 0 ) : SrcX;
+    SrcY = ( SrcY >= ( vMacScreenHeight - DisplayHeight ) ) ? ( vMacScreenHeight - DisplayHeight - 0 ) : SrcY;
 
     Width = ( vMacScreenWidth >= DisplayWidth ) ? DisplayWidth : vMacScreenWidth;
     Height = ( vMacScreenHeight >= DisplayHeight ) ? DisplayHeight : vMacScreenHeight;

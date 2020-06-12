@@ -35,6 +35,7 @@ portMUX_TYPE Crit = portMUX_INITIALIZER_UNLOCKED;
 
 EventGroupHandle_t RenderTaskEventHandle = NULL;
 SemaphoreHandle_t RenderTaskLock = NULL;
+SemaphoreHandle_t SPIBusLock = NULL;
 TaskHandle_t RenderTaskHandle = NULL;
 
 volatile const uint8_t* EmScreenPtr = NULL;
@@ -81,19 +82,23 @@ void RenderTask( void* Param ) {
     PrintCore( __func__ );
 
     while ( true ) {
-        x = MouseX - ( DisplayWidth * 3 ) / 4;
-        y = MouseY - ( DisplayHeight * 3 ) / 4;
+        x = MouseX - ( DisplayWidth * 1 ) / 2;
+        y = MouseY - ( DisplayHeight * 1 ) / 2;
 
         x = x < 0 ? 0 : x;
         y = y < 0 ? 0 : y;
 
         xEventGroupWaitBits( RenderTaskEventHandle, DrawScreenEvent, pdTRUE, pdTRUE, portMAX_DELAY );
 
-        xSemaphoreTake( RenderTaskLock, portMAX_DELAY );
-            if ( EmScreenPtr ) {
-                DrawWindowSubpixel( ( const uint8_t* ) EmScreenPtr, x, y );
-            }
-        xSemaphoreGive( RenderTaskLock );
+        if ( xSemaphoreTake( SPIBusLock, pdMS_TO_TICKS( 5 ) ) == pdTRUE ) {
+            xSemaphoreTake( RenderTaskLock, portMAX_DELAY );
+                if ( EmScreenPtr ) {
+                    DrawWindow( ( const uint8_t* ) EmScreenPtr, x, y );
+                }
+            xSemaphoreGive( RenderTaskLock );
+
+            xSemaphoreGive( SPIBusLock );
+        }
     }
 }
 
@@ -112,10 +117,9 @@ void setup( void ) {
 
     RenderTaskEventHandle = xEventGroupCreate( );
     RenderTaskLock = xSemaphoreCreateMutex( );
+    SPIBusLock = xSemaphoreCreateMutex( );
 
     xTaskCreatePinnedToCore( RenderTask, "RenderTask", 4096, NULL, 0, &RenderTaskHandle, 0 );
-
-    delay( 500 );
 
     Serial.println( ( int ) RenderTaskEventHandle, 16 );
     Serial.println( ( int ) RenderTaskLock, 16 );
@@ -155,30 +159,23 @@ void ArduinoAPI_WritePixels( const uint16_t* Pixels, size_t Count ) {
 }
 
 void ArduinoAPI_GetMouseDelta( int* OutXDeltaPtr, int* OutYDeltaPtr ) {
-    int x = 0;
-    int y = 0;
+    const float fAccel = 6.0f;
+    float dx = 0.0f;
+    float dy = 0.04;
 
-    x-= JoyX - JoyCenterX;
-    y-= JoyY - JoyCenterY;
+    dx-= JoyX - JoyCenterX;
+    dy-= JoyY - JoyCenterY;
 
-    //*OutXDeltaPtr = SerMouseDX;
-    //*OutYDeltaPtr = SerMouseDY;
+    dx/= 384.0f;
+    dy/= 384.0f;
 
-    if ( x < -100 ) {
-        *OutXDeltaPtr = 3;
-    } else if ( x > 100 ) {
-        *OutXDeltaPtr = -3;
-    } else {
-        *OutXDeltaPtr = 0;
-    }
+    dx*= fAccel;
+    dy*= fAccel;
 
-    if ( y < -100 ) {
-        *OutYDeltaPtr = -3;
-    } else if ( y > 100 ) {
-        *OutYDeltaPtr = 3;
-    } else {
-        *OutYDeltaPtr = 0;
-    }
+    *OutXDeltaPtr = -( int ) dx;
+    *OutYDeltaPtr = ( int ) dy;
+
+    //printf( "Joy: %.2f,%.2f\n", dx, dy );
 
     SerMouseDX = 0;
     SerMouseDY = 0;
@@ -190,7 +187,7 @@ void ArduinoAPI_GiveEmulatedMouseToArduino( int* EmMouseX, int* EmMouseY ) {
 }
 
 int ArduinoAPI_GetMouseButton( void ) {
-    return SerMouseDown || JoyButtonState || M5.BtnA.isPressed( ) || M5.BtnB.isPressed( ) || M5.BtnC.isPressed( );;
+    return SerMouseDown || JoyButtonState || M5.BtnA.isPressed( ) || M5.BtnB.isPressed( ) || M5.BtnC.isPressed( );
 }
 
 uint64_t ArduinoAPI_GetTimeMS( void ) {
@@ -213,9 +210,9 @@ ArduinoFile ArduinoAPI_open( const char* Path, const char* Mode ) {
 
     printf( "File: %s = ", SPIFFSPath );
 
-    portENTER_CRITICAL( &Crit );
+    xSemaphoreTake( SPIBusLock, portMAX_DELAY );
         Handle = ( ArduinoFile ) fopen( SPIFFSPath, Mode );
-    portEXIT_CRITICAL( &Crit );
+    xSemaphoreGive( SPIBusLock );
 
     printf( "%p\n", ( void* ) Handle );
 
@@ -224,9 +221,9 @@ ArduinoFile ArduinoAPI_open( const char* Path, const char* Mode ) {
 
 void ArduinoAPI_close( ArduinoFile Handle ) {
     if ( Handle ) {
-        portENTER_CRITICAL( &Crit );
+        xSemaphoreTake( SPIBusLock, portMAX_DELAY );
             fclose( ( FILE* ) Handle );
-        portEXIT_CRITICAL( &Crit );
+        xSemaphoreGive( SPIBusLock );
     }
 }
 
@@ -234,9 +231,9 @@ size_t ArduinoAPI_read( void* Buffer, size_t Size, size_t Nmemb, ArduinoFile Han
     size_t BytesRead = 0;
 
     if ( Handle ) {
-        portENTER_CRITICAL( &Crit );
+        xSemaphoreTake( SPIBusLock, portMAX_DELAY );
             BytesRead = fread( Buffer, Size, Nmemb, ( FILE* ) Handle );
-        portEXIT_CRITICAL( &Crit );
+        xSemaphoreGive( SPIBusLock );
     }
 
     return BytesRead;
@@ -246,9 +243,9 @@ size_t ArduinoAPI_write( const void* Buffer, size_t Size, size_t Nmemb, ArduinoF
     size_t BytesWritten = 0;
 
     if ( Handle ) {
-        portENTER_CRITICAL( &Crit );
+        xSemaphoreTake( SPIBusLock, portMAX_DELAY );
             BytesWritten = fwrite( Buffer, Size, Nmemb, ( FILE* ) Handle );
-        portEXIT_CRITICAL( &Crit );
+        xSemaphoreGive( SPIBusLock );
     }
 
     return BytesWritten;
@@ -258,9 +255,9 @@ long ArduinoAPI_tell( ArduinoFile Handle ) {
     long Offset = 0;
 
     if ( Handle ) {
-        portENTER_CRITICAL( &Crit );
+        xSemaphoreTake( SPIBusLock, portMAX_DELAY );
             Offset = ftell( ( FILE* ) Handle );
-        portEXIT_CRITICAL( &Crit );
+        xSemaphoreGive( SPIBusLock );
     }
 
     return Offset;
@@ -270,9 +267,9 @@ long ArduinoAPI_seek( ArduinoFile Handle, long Offset, int Whence ) {
     long Result = -1;
 
     if ( Handle ) {
-        portENTER_CRITICAL( &Crit );
+        xSemaphoreTake( SPIBusLock, portMAX_DELAY );
             Result = fseek( ( FILE* ) Handle, Offset, Whence );
-        portEXIT_CRITICAL( &Crit );
+        xSemaphoreGive( SPIBusLock );
     }
 
     return Result;
@@ -282,9 +279,9 @@ int ArduinoAPI_eof( ArduinoFile Handle ) {
     int IsEOF = 0;
 
     if ( Handle ) {
-        portENTER_CRITICAL( &Crit );
+        xSemaphoreTake( SPIBusLock, portMAX_DELAY );
             IsEOF = feof( ( FILE* ) Handle );
-        portEXIT_CRITICAL( &Crit );
+        xSemaphoreGive( SPIBusLock );
     }
 
     return IsEOF;
@@ -340,16 +337,27 @@ void ArduinoAPI_ScreenChanged( int Top, int Left, int Bottom, int Right ) {
 }
 
 void ArduinoAPI_DrawScreen( const uint8_t* Screen ) {
+    int x = 0;
+    int y = 0;
+
     if ( Changed ) {
         EmScreenPtr = Screen;
         Changed = false;
 
-        //DrawWindowSubpixel( Screen, 0, 0 );
+        x = MouseX - ( DisplayWidth * 3 ) / 4;
+        y = MouseY - ( DisplayHeight * 3 ) / 4;
 
+        x = x < 0 ? 0 : x;
+        y = y < 0 ? 0 : y;
+
+        //DrawWindowSubpixel( Screen, x, y );
+        //DrawWindowScaled( Screen, 0, 0 );
+#if 1
         if ( xSemaphoreTake( RenderTaskLock, 0 ) == pdTRUE ) {
             xSemaphoreGive( RenderTaskLock );
 
             xEventGroupSetBits( RenderTaskEventHandle, DrawScreenEvent );
         }
+#endif
     }
 }
