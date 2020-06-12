@@ -27,7 +27,7 @@
 #define kAutoSlowSubTicks 16384
 #define kAutoSlowTime 34
 
-#define kRAMa_Size 0x00080000
+#define kRAMa_Size 0x00200000
 #define kRAMb_Size 0x00080000
 
 #define IncludeVidMem 0

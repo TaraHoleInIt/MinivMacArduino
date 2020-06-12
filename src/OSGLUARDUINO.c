@@ -2068,6 +2068,7 @@ int minivmac_main(int argc, char **argv)
 	my_argv = argv;
 
 	ZapOSGLUVars();
+
 	if (InitOSGLU()) {
 		ProgramMain();
 	}
