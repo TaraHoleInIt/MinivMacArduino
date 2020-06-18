@@ -11,6 +11,12 @@
 
 #include "ArduinoAPI.h"
 #include "ArduinoDraw.h"
+#include "ArduinoKeyboard.h"
+
+#include "SYSDEPNS.h"
+#include "CNFGGLOB.h"
+#include "CNFGRAPI.h"
+#include "MYOSGLUE.h"
 
 #define DisplayWidth 320
 #define DisplayHeight 240
@@ -22,9 +28,7 @@ const int Pin_MISO = 12;
 const int Pin_MOSI = 13;
 const int Pin_CLK = 14;
 
-bool SerMouseDown = false;
-int SerMouseDX = 0;
-int SerMouseDY = 0;
+volatile bool ShowKeyboard = true;
 
 int MouseX = 0;
 int MouseY = 0;
@@ -43,9 +47,52 @@ volatile const uint8_t* EmScreenPtr = NULL;
 int JoyCenterX = 0;
 int JoyCenterY = 0;
 
-bool JoyButtonState = false;
-int JoyX = 0;
-int JoyY = 0;
+int VirtMouseX = 0;
+int VirtMouseY = 0;
+
+volatile bool JoyButtonState = false;
+volatile bool LastJoyButtonState = false;
+
+volatile float JoyDx = 0.0f;
+volatile float JoyDy = 0.0f;
+
+void DrawKeyboard( void );
+
+void M5JoyGetDelta( float* Outdx, float* Outdy, bool* OutButton ) {
+    const float AccelValue = 6.0f;
+    bool Button = false;
+    float dx = 0.0f;
+    float dy = 0.0f;
+    int X = 0;
+    int Y = 0;
+
+    Wire.requestFrom( 0x5E, 5 );
+
+    LastJoyButtonState = JoyButtonState;
+
+    if ( Wire.available( ) ) {
+        Y = Wire.read( );
+        Y |= ( Wire.read( ) << 8 );
+
+        X = Wire.read( );
+        X |= ( Wire.read( ) << 8 );
+
+        Button = ( bool ) ! Wire.read( );
+
+        dx = ( float ) ( X - JoyCenterX );
+        dy = ( float ) ( Y - JoyCenterY );
+
+        dx/= 384.0f;
+        dy/= 384.0f;
+
+        dx*= AccelValue;
+        dy*= AccelValue;
+
+        if ( Outdx ) *Outdx = dx;
+        if ( Outdy ) *Outdy = dy;
+        if ( OutButton ) *OutButton = Button;
+    }    
+}
 
 void M5JoyRead( int* OutJoyX, int* OutJoyY, bool* OutButton ) {
     bool Button = false;
@@ -64,9 +111,41 @@ void M5JoyRead( int* OutJoyX, int* OutJoyY, bool* OutButton ) {
         Button = ( bool ) ! Wire.read( );
     }
 
-    *OutButton = Button;
-    *OutJoyX = X;
-    *OutJoyY = Y;
+    if ( OutButton != NULL ) {
+        *OutButton = Button;
+    }
+
+    if ( OutJoyX != NULL ) {
+        *OutJoyX = X;
+    }
+
+    if ( OutJoyY != NULL ) {
+        *OutJoyY = Y;
+    }
+}
+
+void CenterJoystick( void ) {
+    bool Button = false;
+    int x = 0;
+    int y = 0;
+
+    M5.Lcd.clear( TFT_WHITE );
+
+    M5.Lcd.setTextColor( TFT_BLACK, TFT_WHITE );
+
+    M5.Lcd.setTextFont( 1 );
+    M5.Lcd.setTextSize( 1 );
+
+    M5.Lcd.drawCentreString( "Leave the joystick centered.", DisplayWidth/ 2, DisplayHeight / 2, 2 );
+    M5.Lcd.drawCentreString( "Press any button to continue.", DisplayWidth / 2, ( DisplayHeight / 2 ) + 16, 2 );
+
+    do {
+        M5.update( );
+        M5JoyRead( &x, &y, &Button );
+        
+        delay( 100 );
+    }
+    while ( ! ( M5.BtnA.pressedFor( 10 ) || M5.BtnA.pressedFor( 10 ) || M5.BtnC.pressedFor( 10 ) ) );
 }
 
 void PrintCore( const char* Str ) {
@@ -94,6 +173,10 @@ void RenderTask( void* Param ) {
             xSemaphoreTake( RenderTaskLock, portMAX_DELAY );
                 if ( EmScreenPtr ) {
                     DrawWindow( ( const uint8_t* ) EmScreenPtr, x, y );
+
+                    if ( ShowKeyboard ) {
+                        DrawKeyboard( );
+                    }
                 }
             xSemaphoreGive( RenderTaskLock );
 
@@ -103,12 +186,13 @@ void RenderTask( void* Param ) {
 }
 
 void setup( void ) {
-    //Wire.begin( );
     M5.begin( true, true, true, true );
+    M5.Speaker.mute( );
 
-    M5JoyRead( &JoyCenterX, &JoyCenterY, &JoyButtonState );
+    CenterJoystick( );
+    M5JoyRead( &JoyCenterX, &JoyCenterY, ( bool* ) &JoyButtonState );
 
-    M5.Lcd.clear( 0xAB50 );
+    M5.Lcd.clear( TFT_BLACK );
 
     //SPIFFS.begin( );
 
@@ -159,26 +243,8 @@ void ArduinoAPI_WritePixels( const uint16_t* Pixels, size_t Count ) {
 }
 
 void ArduinoAPI_GetMouseDelta( int* OutXDeltaPtr, int* OutYDeltaPtr ) {
-    const float fAccel = 6.0f;
-    float dx = 0.0f;
-    float dy = 0.04;
-
-    dx-= JoyX - JoyCenterX;
-    dy-= JoyY - JoyCenterY;
-
-    dx/= 384.0f;
-    dy/= 384.0f;
-
-    dx*= fAccel;
-    dy*= fAccel;
-
-    *OutXDeltaPtr = -( int ) dx;
-    *OutYDeltaPtr = ( int ) dy;
-
-    //printf( "Joy: %.2f,%.2f\n", dx, dy );
-
-    SerMouseDX = 0;
-    SerMouseDY = 0;
+    *OutXDeltaPtr = ( int ) JoyDx;
+    *OutYDeltaPtr = -( int ) JoyDy;
 }
 
 void ArduinoAPI_GiveEmulatedMouseToArduino( int* EmMouseX, int* EmMouseY ) {
@@ -187,11 +253,11 @@ void ArduinoAPI_GiveEmulatedMouseToArduino( int* EmMouseX, int* EmMouseY ) {
 }
 
 int ArduinoAPI_GetMouseButton( void ) {
-    return SerMouseDown || JoyButtonState || M5.BtnA.isPressed( ) || M5.BtnB.isPressed( ) || M5.BtnC.isPressed( );
+    return JoyButtonState || M5.BtnA.isPressed( );
 }
 
 uint64_t ArduinoAPI_GetTimeMS( void ) {
-    return ( uint64_t ) 1591551981844L + ( uint64_t ) millis( );
+    return ( uint64_t ) millis( );
 }
 
 void ArduinoAPI_Yield( void ) {
@@ -207,14 +273,10 @@ ArduinoFile ArduinoAPI_open( const char* Path, const char* Mode ) {
     char SPIFFSPath[ 256 ];
 
     snprintf( SPIFFSPath, sizeof( SPIFFSPath ), "/sd/%s", Path );
-
-    printf( "File: %s = ", SPIFFSPath );
-
+    
     xSemaphoreTake( SPIBusLock, portMAX_DELAY );
         Handle = ( ArduinoFile ) fopen( SPIFFSPath, Mode );
     xSemaphoreGive( SPIBusLock );
-
-    printf( "%p\n", ( void* ) Handle );
 
     return Handle;
 }
@@ -299,65 +361,44 @@ void ArduinoAPI_free( void* Memory ) {
     heap_caps_free( Memory );
 }
 
+bool Changed = false;
+
 void ArduinoAPI_CheckForEvents( void ) {
     M5.update( );
-    M5JoyRead( &JoyX, &JoyY, &JoyButtonState );
+    M5JoyGetDelta( ( float* ) &JoyDx, ( float* ) &JoyDy, ( bool* ) &JoyButtonState );
 
-    while ( Serial.available( ) ) {
-        switch ( Serial.read( ) ) {
-            case 'w': {
-                SerMouseDY-= 2;
-                break;
-            }
-            case 's': {
-                SerMouseDY+= 2;
-                break;
-            }
-            case 'a': {
-                SerMouseDX-= 2;
-                break;
-            }
-            case 'd': {
-                SerMouseDX+= 2;
-                break;
-            }
-            case ' ': {
-                SerMouseDown = ! SerMouseDown;
-                break;
-            }
-            default: break;
-        }
+    if ( M5.BtnB.wasReleasefor( 10 ) ) {
+        ShowKeyboard = ! ShowKeyboard;
+        Changed = true;
+    }
+
+    if ( ShowKeyboard ) {
+        UpdateKeyboard( );
     }
 }
-
-bool Changed = false;
 
 void ArduinoAPI_ScreenChanged( int Top, int Left, int Bottom, int Right ) {
     Changed = true;
 }
 
+extern volatile bool KeyChanged;
+
 void ArduinoAPI_DrawScreen( const uint8_t* Screen ) {
     int x = 0;
     int y = 0;
 
-    if ( Changed ) {
+    if ( Changed || ( ShowKeyboard && ( KeyChanged || ( JoyButtonState != LastJoyButtonState ) ) ) ) {
+        if ( ShowKeyboard ) {
+            KeyChanged = false;
+        }
+
         EmScreenPtr = Screen;
         Changed = false;
 
-        x = MouseX - ( DisplayWidth * 3 ) / 4;
-        y = MouseY - ( DisplayHeight * 3 ) / 4;
-
-        x = x < 0 ? 0 : x;
-        y = y < 0 ? 0 : y;
-
-        //DrawWindowSubpixel( Screen, x, y );
-        //DrawWindowScaled( Screen, 0, 0 );
-#if 1
         if ( xSemaphoreTake( RenderTaskLock, 0 ) == pdTRUE ) {
             xSemaphoreGive( RenderTaskLock );
 
             xEventGroupSetBits( RenderTaskEventHandle, DrawScreenEvent );
         }
-#endif
     }
 }
