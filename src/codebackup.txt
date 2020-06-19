@@ -1,0 +1,205 @@
+void M5JoyRead( int* OutJoyX, int* OutJoyY, bool* OutButton ) {
+    bool Button = false;
+    int X = 0;
+    int Y = 0;
+
+    Wire.requestFrom( 0x5E, 5 );
+
+    if ( Wire.available( ) ) {
+        Y = Wire.read( );
+        Y |= ( Wire.read( ) << 8 );
+
+        X = Wire.read( );
+        X |= ( Wire.read( ) << 8 );
+
+        Button = ( bool ) ! Wire.read( );
+    }
+
+    AssignNotNull( OutJoyX, X );
+    AssignNotNull( OutJoyY, Y );
+    AssignNotNull( OutButton, Button );
+}
+
+void M5JoyGetDelta( float* Outdx, float* Outdy, bool* Outbutton ) {
+#if 0
+    const float AccelValue = 6.0f;
+    bool Button = 0;
+    float dx = 0.0f;
+    float dy = 0.0f;
+    int x = 0;
+    int y = 0;
+
+    M5JoyRead( &x, &y, &Button );
+
+    dx = ( float ) ( x - JoyCenterX );
+    dy = ( float ) ( y - JoyCenterY );
+
+    dx/= 384.0f;
+    dy/= 384.0f;
+
+    dx*= AccelValue;
+    dy*= AccelValue;
+#endif
+    bool Button = false;
+    float dx = 0.0f;
+    float dy = 0.0f;
+    float x = 0.0f;
+    float y = 0.0f;
+    float z = 0.0f;
+    int i = 0;
+
+    for ( i = 0; i < 10; i++ ) {
+        M5.IMU.getAccelData( &x, &y, &z );
+
+        dx+= x;
+        dy+= y;
+    }
+
+    dx/= 10.0f;
+    dy/= 10.0f;
+
+    dx-= TareX;
+    dy-= TareY;
+
+    dx = fabs( dx ) > 0.20f ? -dx * 6.0f : 0.0f;
+    dy = fabs( dy ) > 0.20f ? -dy * 6.0f : 0.0f;
+
+    Button = M5.BtnA.isPressed( );
+
+    AssignNotNull( Outdx, dx );
+    AssignNotNull( Outdy, dy );
+    AssignNotNull( Outbutton, Button );
+}
+
+void CenterJoystick( void ) {
+    bool Button = false;
+    int x = 0;
+    int y = 0;
+
+    M5.Lcd.clear( TFT_WHITE );
+
+    M5.Lcd.setTextColor( TFT_BLACK, TFT_WHITE );
+
+    M5.Lcd.setTextFont( 1 );
+    M5.Lcd.setTextSize( 1 );
+
+    M5.Lcd.drawCentreString( "Leave the joystick centered.", DisplayWidth/ 2, DisplayHeight / 2, 2 );
+    M5.Lcd.drawCentreString( "Press any button to continue.", DisplayWidth / 2, ( DisplayHeight / 2 ) + 16, 2 );
+
+    do {
+        M5.update( );
+        M5JoyRead( &x, &y, &Button );
+        
+        delay( 100 );
+    }
+    while ( ! ( M5.BtnA.pressedFor( 10 ) || M5.BtnA.pressedFor( 10 ) || M5.BtnC.pressedFor( 10 ) ) );
+}
+
+#define AssignNotNull( ptr, value ) if ( ( ptr ) ) *( ptr ) = ( value )
+
+void M5JoyRead( int* OutJoyX, int* OutJoyY, bool* OutButton ) {
+    bool Button = false;
+    int X = 0;
+    int Y = 0;
+
+    Wire.requestFrom( 0x5E, 5 );
+
+    if ( Wire.available( ) ) {
+        Y = Wire.read( );
+        Y |= ( Wire.read( ) << 8 );
+
+        X = Wire.read( );
+        X |= ( Wire.read( ) << 8 );
+
+        Button = ( bool ) ! Wire.read( );
+    }
+
+    AssignNotNull( OutJoyX, X );
+    AssignNotNull( OutJoyY, Y );
+    AssignNotNull( OutButton, Button );
+}
+
+void DrawKeyboard( void ) {
+    const uint8_t* Src = KB_Lowercase_Image;
+    static uint16_t Buffer[ KeyboardWidth ];
+    uint16_t* Dest = NULL;
+    int DisplayWidth = 0;
+    int DisplayHeight = 0;
+    uint8_t Data = 0;
+    int Key = 0;
+    int x = 0;
+    int y = 0;
+
+    ArduinoAPI_GetDisplayDimensions( &DisplayWidth, &DisplayHeight );
+
+    x = ( DisplayWidth / 2 ) - ( KeyboardWidth / 2 );
+    y = ( DisplayHeight - KeyboardHeight );
+
+    //ArduinoAPI_SetAddressWindow( x, y, x + KeyboardWidth, y + KeyboardHeight );
+    
+    for ( y = 0; y < KeyboardHeight; y++ ) {
+        Dest = Buffer;
+
+        for ( x = 0; x < KeyboardWidth; x+= 8 ) {
+            Key = ( int ) Touchmap[ y / 8 ][ x / 8 ];
+            Data = *Src++;
+
+            if ( Key == SelectedKey ) {
+                if ( JoyButtonState || M5.BtnA.isPressed( ) ) {
+                    Data = ~Data;
+                } else {
+                    Data = ( y & 1 ) ? Data & ~0x55 : Data & ~0xAA;
+                }
+            }
+
+            *Dest++ = Data & 0x80 ? 0xFFFF : 0x0000;
+            *Dest++ = Data & 0x40 ? 0xFFFF : 0x0000;
+            *Dest++ = Data & 0x20 ? 0xFFFF : 0x0000;
+            *Dest++ = Data & 0x10 ? 0xFFFF : 0x0000;
+            *Dest++ = Data & 0x08 ? 0xFFFF : 0x0000;
+            *Dest++ = Data & 0x04 ? 0xFFFF : 0x0000;
+            *Dest++ = Data & 0x02 ? 0xFFFF : 0x0000;
+            *Dest++ = Data & 0x01 ? 0xFFFF : 0x0000;
+        }
+
+        //ArduinoAPI_WritePixels( Buffer, KeyboardWidth );
+    }
+}
+
+void UpdateKeyboard( void ) {
+    bool Button = false;
+    bool Press = false;
+    float dx = 0.0f;
+    float dy = 0.0f;
+
+    M5JoyGetDelta( &dx, &dy, &Button );
+
+    KBMouseX+= ( fabs( dx ) >= 1.0f ) ? dx : 0;
+    KBMouseY+= ( fabs( dy ) >= 1.0f ) ? -dy : 0;
+
+    KBMouseX = ( KBMouseX < 0 ) ? 0 : KBMouseX;
+    KBMouseX = ( KBMouseX >= KeyboardWidth ) ? KeyboardWidth - 1 : KBMouseX;
+
+    KBMouseY = ( KBMouseY < 0 ) ? 0 : KBMouseY;
+    KBMouseY = ( KBMouseY >= KeyboardHeight ) ? KeyboardHeight - 1 : KBMouseY;
+
+    SelectedKey = Touchmap[ KBMouseY / 8 ][ KBMouseX / 8 ];
+
+    if ( SelectedKey != LastKey ) {
+        MinivMacAPI_UpdateKey( LastKey, 0 );
+        LastKey = SelectedKey;
+        KeyChanged = true;
+    }
+
+    Press = Button || M5.BtnA.isPressed( );
+
+    if ( Press != LastPress ) {
+        if ( Press ) {
+            MinivMacAPI_UpdateKey( SelectedKey, 1 );
+        } else {
+            MinivMacAPI_UpdateKey( SelectedKey, 0 );
+        }
+
+        LastPress = Press;
+    }
+}

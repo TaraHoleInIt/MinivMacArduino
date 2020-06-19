@@ -152,12 +152,12 @@ IRAM_ATTR void DrawWindowSubpixel( const uint8_t* Src, int SrcX, int SrcY ) {
 
     Temp = ( DisplayWidth * 3 ) / 2;
 
-    SrcX = ( SrcX >= ( vMacScreenWidth - Temp ) ) ? ( vMacScreenWidth - Temp ) : SrcX;
-    SrcY = ( SrcY >= ( vMacScreenHeight - DisplayHeight ) ) ? ( vMacScreenHeight - DisplayHeight ) : SrcY;
-    DisplayWidth = Temp >= DisplayWidth ? DisplayWidth : Temp;
+    //SrcX = ( SrcX >= ( vMacScreenWidth - Temp ) ) ? ( vMacScreenWidth - Temp ) : SrcX;
+    //SrcY = ( SrcY >= ( vMacScreenHeight - DisplayHeight ) ) ? ( vMacScreenHeight - DisplayHeight ) : SrcY;
+    //DisplayWidth = Temp >= DisplayWidth ? DisplayWidth : Temp;
 
-    DisplayWidth = vMacScreenWidth > DisplayWidth ? DisplayWidth : vMacScreenWidth;
-    DisplayHeight = vMacScreenWidth > DisplayHeight ? DisplayHeight : vMacScreenHeight;
+    //DisplayWidth = vMacScreenWidth > DisplayWidth ? DisplayWidth : vMacScreenWidth;
+    //DisplayHeight = vMacScreenWidth > DisplayHeight ? DisplayHeight : vMacScreenHeight;
 
     ArduinoAPI_SetAddressWindow( 0, 0, DisplayWidth, DisplayHeight );
 
